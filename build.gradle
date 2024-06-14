@@ -7,7 +7,7 @@ plugins {
     id 'maven-publish'
     id 'idea'
     alias libs.plugins.shadow
-    alias libs.plugins.nukkitPluginYAML
+    alias libs.plugins.bukkitPluginYAML
 }
 
 apply plugin: "java"
@@ -20,7 +20,10 @@ repositories {
 }
 
 dependencies {
+    compileOnly files("lib/PaperSpigot-1.8.8-R0.1-SNAPSHOT.jar")
+
     compileOnly(libs.annotations.get())
+    compileOnly(libs.miwiklark.get())
 
     compileOnly(libs.lombok.get())
     annotationProcessor(libs.lombok.get())
@@ -61,9 +64,8 @@ java {
     withSourcesJar()
 }
 
-nukkit {
-    main = "it.bitrule.phoenix.Phoenix"
-    api = ["1.0.0"]
+bukkit {
+    main = "it.bitrule.tebex.TebexPlugin"
     version = "${project.version}"
     authors = ["bitrule"]
     description = "${findProperty("plugin-description")}"
