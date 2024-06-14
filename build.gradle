@@ -1,0 +1,35 @@
+import it.bitrule.plorex.script.ASpotlessPlugin
+import it.bitrule.plorex.script.CommonPlugin
+import it.bitrule.plorex.script.PublishPlugin
+
+plugins {
+    id "java"
+    id "maven-publish"
+    alias libs.plugins.shadow
+}
+
+subprojects {
+    version = rootProject.version
+
+    apply plugin: "java"
+    apply plugin: ASpotlessPlugin
+    apply plugin: CommonPlugin
+    apply plugin: PublishPlugin
+
+    repositories {
+        mavenLocal()
+    }
+
+    dependencies {
+        implementation libs.annotations.get()
+        implementation libs.lombok.get()
+
+        annotationProcessor libs.lombok.get()
+    }
+
+    tasks {
+        named("build") {
+            dependsOn(named("spotlessApply"))
+        }
+    }
+}
