@@ -27,31 +27,21 @@ public final class TebexPlugin extends JavaPlugin {
             throw new RuntimeException("tebex.csv not found");
         }
 
-        String mongodbUri = this.getConfig().getString("mongodb-uri");
-        if (mongodbUri == null || mongodbUri.isEmpty()) {
-            throw new RuntimeException("MongoDB URI not found");
-        }
-
         ConfigurationSection mongoSection = this.getConfig().getConfigurationSection("mongodb");
         if (mongoSection == null) {
             throw new RuntimeException("MongoDB section not found");
         }
 
         String dbUsername = mongoSection.getString("username");
-        String password = mongoSection.getString("password");
 
         if (dbUsername == null || dbUsername.isEmpty()) {
             throw new RuntimeException("MongoDB username not found");
         }
 
-        if (password == null || password.isEmpty()) {
-            throw new RuntimeException("MongoDB password not found");
-        }
-
         String address = mongoSection.getString("address");
         String[] addressSplit = address.split(":");
 
-        Miwiklark.authMongo(String.format("mongodb://%s:%s@%s:%s/", dbUsername, password, addressSplit[0], addressSplit.length > 1 ? addressSplit[1] : "27017"));
+        Miwiklark.authMongo(String.format("mongodb://%s:%s@%s:%s/", dbUsername, mongoSection.getString("password"), addressSplit[0], addressSplit.length > 1 ? addressSplit[1] : "27017"));
 
         String dbName = mongoSection.getString("db-name");
         if (dbName == null || dbName.isEmpty()) {
@@ -101,26 +91,33 @@ public final class TebexPlugin extends JavaPlugin {
                 String status = parts[3];
                 if (!status.equals("Complete")) continue;
 
-                String username = parts[5];
-                String uuid = parts[6];
+                String finalPackages = validatePackages(parts);
+                if (finalPackages == null) {
+                    System.out.println("Failed to find packages for " + transactionId);
 
-                String[] packages = parts[15].split(",");
-                if (packages.length == 0) {
-                    throw new RuntimeException("No packages in tebex.csv for transaction " + transactionId);
+                    continue;
                 }
 
+                String uuid = parts[6];
                 if (uuid.startsWith("0000000000000000000000")) {
                     repository.save(new TebexIdTransaction(
                             transactionId,
-                            String.join(", ", packages)
+                            finalPackages
                     ));
 
                     continue;
                 }
 
+                if (premiumRepository.findOne(transactionId).isPresent()) continue;
+
+                String username = parts[5];
+                System.out.println("Processing transaction " + transactionId + " for " + username + " with packages " + finalPackages);
+//
                 JsonObject jsonObject = this.parseJson("https://laby.net/api/search/get-previous-accounts/" + username);
                 if (jsonObject == null) {
-                    throw new RuntimeException("Failed to fetch previous accounts for " + username);
+                    System.out.println("Failed to fetch previous accounts for " + username);
+
+                    continue;
                 }
 
                 JsonPrimitive hiddenObject = jsonObject.getAsJsonPrimitive("has_hidden");
@@ -133,11 +130,7 @@ public final class TebexPlugin extends JavaPlugin {
 
                 if (jsonArray.size() == 0) continue;
 
-                System.out.println(jsonArray.size() + " previous accounts for " + username);
-
                 long purchasedTime = simpleDateFormat.parse(date.replaceAll("T", "").replaceAll("\\+", "")).getTime();
-
-//                System.out.println("Purchased time: " + purchasedTime);
 
                 JsonObject betterJsonObject = null;
                 Long betterChangedAt = null;
@@ -184,12 +177,12 @@ public final class TebexPlugin extends JavaPlugin {
 
                 if (betterJsonObject == null) continue;
 
-                System.out.println("Better account is " + betterJsonObject.get("uuid").getAsString());
+//                System.out.println("Better account is " + betterJsonObject.get("uuid").getAsString());
 
                 premiumRepository.save(new TebexTransaction(
                         transactionId,
                         betterJsonObject.get("uuid").getAsString(),
-                        String.join(", ", packages)
+                        finalPackages
                 ));
             }
         } catch (Exception e) {
@@ -198,6 +191,14 @@ public final class TebexPlugin extends JavaPlugin {
 
         this.getConfig().set("import", false);
         this.saveConfig();
+    }
+
+    private static @Nullable String validatePackages(String[] parts) {
+        for (int j = parts.length - 1; j >= 0; j--) {
+            if (parts[j].equals("'Permanents'") || parts[j].equals("'Upgrades'")) return parts[j - 1];
+        }
+
+        return null;
     }
 
     private @Nullable JsonObject parseJson(@NonNull String urlString) {

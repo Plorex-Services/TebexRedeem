@@ -42,7 +42,7 @@ public final class PlayerJoinListener implements Listener {
                             String[] packages = transaction.getPackageName().split(", ");
 
                             for (String packageName : packages) {
-                                List<String> commands = this.plugin.getConfig().getStringList("packages." + packageName);
+                                List<String> commands = this.plugin.getConfig().getStringList("packages." + packageName.replaceAll("'", ""));
                                 if (commands == null || commands.isEmpty()) continue;
 
                                 for (String command : commands) {
