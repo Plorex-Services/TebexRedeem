@@ -5,6 +5,7 @@ import it.bitrule.miwiklark.common.Miwiklark;
 import it.bitrule.miwiklark.common.repository.Repository;
 import it.bitrule.tebex.command.RedeemCommandExecutor;
 import it.bitrule.tebex.listener.PlayerJoinListener;
+import it.bitrule.tebex.model.TebexIdTransaction;
 import it.bitrule.tebex.model.TebexTransaction;
 import lombok.NonNull;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -25,15 +26,27 @@ public final class TebexPlugin extends JavaPlugin {
             throw new RuntimeException("tebex.csv not found");
         }
 
-        this.getCommand("redeem").setExecutor(new RedeemCommandExecutor(this));
+        String mongodbUri = this.getConfig().getString("mongodb-uri");
+        if (mongodbUri == null || mongodbUri.isEmpty()) {
+            throw new RuntimeException("MongoDB URI not found");
+        }
 
-        this.getServer().getPluginManager().registerEvents(new PlayerJoinListener(this), this);
+        Miwiklark.authMongo(mongodbUri);
 
-        Repository<TebexTransaction> repository = Miwiklark.addRepository(
+        Repository<TebexTransaction> premiumRepository = Miwiklark.addRepository(
                 TebexTransaction.class,
                 "tebex",
                 "premium"
         );
+        Repository<TebexIdTransaction> repository = Miwiklark.addRepository(
+                TebexIdTransaction.class,
+                "tebex",
+                "id"
+        );
+
+        this.getCommand("redeem").setExecutor(new RedeemCommandExecutor(this));
+
+        this.getServer().getPluginManager().registerEvents(new PlayerJoinListener(this), this);
 
         if (!this.getConfig().getBoolean("import")) return;
 
@@ -66,11 +79,18 @@ public final class TebexPlugin extends JavaPlugin {
                 String username = parts[5];
                 String uuid = parts[6];
 
-                if (uuid.startsWith("0000000000000000000000")) continue;
-
                 String[] packages = parts[15].split(",");
                 if (packages.length == 0) {
                     throw new RuntimeException("No packages in tebex.csv for transaction " + transactionId);
+                }
+
+                if (uuid.startsWith("0000000000000000000000")) {
+                    repository.save(new TebexIdTransaction(
+                            transactionId,
+                            String.join(", ", packages)
+                    ));
+
+                    continue;
                 }
 
                 JsonObject jsonObject = this.parseJson("https://laby.net/api/search/get-previous-accounts/" + username);
@@ -122,19 +142,18 @@ public final class TebexPlugin extends JavaPlugin {
                         if (!name.equals(username)) continue;
 
                         JsonElement changedAtObject = historyObject.get("changed_at");
-                        if (changedAtObject == null || changedAtObject.isJsonNull()) continue;
+                        if (changedAtObject != null && !changedAtObject.isJsonNull()) {
+                            String changedAt = changedAtObject.getAsString();
+                            if (changedAt == null) continue;
 
-                        String changedAt = changedAtObject.getAsString();
-                        if (changedAt == null) continue;
+                            long changedAtTime = simpleDateFormat.parse(changedAt.replaceAll("T", "").replaceAll("\\+", "")).getTime();
+                            if (changedAtTime > purchasedTime) continue;
+                            if (betterChangedAt != null && betterChangedAt > changedAtTime) continue;
 
-                        long changedAtTime = simpleDateFormat.parse(changedAt.replaceAll("T", "").replaceAll("\\+", "")).getTime();
-                        if (changedAtTime > purchasedTime) continue;
-                        if (betterChangedAt != null && betterChangedAt > changedAtTime) continue;
+                            betterChangedAt = changedAtTime;
+                        }
 
                         betterJsonObject = userObject;
-                        betterChangedAt = changedAtTime;
-
-                        System.out.println("Found better account " + userObject.get("uuid").getAsString() + " with changed_at " + changedAt + " for " + username);
                     }
                 }
 
@@ -142,7 +161,7 @@ public final class TebexPlugin extends JavaPlugin {
 
                 System.out.println("Better account is " + betterJsonObject.get("uuid").getAsString());
 
-                repository.save(new TebexTransaction(
+                premiumRepository.save(new TebexTransaction(
                         transactionId,
                         betterJsonObject.get("uuid").getAsString(),
                         String.join(", ", packages)

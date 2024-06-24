@@ -1,4 +1,6 @@
 import: true
+mongodb-uri: ""
+
 packages:
   Kraken:
     - say hi {player}!
