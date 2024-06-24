@@ -23,7 +23,7 @@ dependencies {
     compileOnly files("lib/PaperSpigot-1.8.8-R0.1-SNAPSHOT.jar")
 
     compileOnly(libs.annotations.get())
-    compileOnly(libs.miwiklark.get())
+    implementation(libs.miwiklark.get())
 
     compileOnly(libs.lombok.get())
     annotationProcessor(libs.lombok.get())
@@ -39,7 +39,7 @@ tasks {
     }
 
     shadowJar {
-        archiveFileName.set("${rootProject.name}-${version}.jar")
+        archiveFileName.set("${rootProject.name}-v${version}.jar")
     }
 
     compileJava {
@@ -70,4 +70,12 @@ bukkit {
     authors = ["bitrule"]
     description = "${findProperty("plugin-description")}"
     name = "${findProperty("plugin-name")}"
+
+    commands {
+        "redeem" {
+            description = "Redeem a code"
+            permission = "tebex.redeem"
+            usage = "/redeem <code>"
+        }
+    }
 }

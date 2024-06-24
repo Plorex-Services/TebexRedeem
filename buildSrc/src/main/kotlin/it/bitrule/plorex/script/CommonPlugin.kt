@@ -26,7 +26,7 @@ class CommonPlugin : Plugin<Project> {
 
             configure<JavaPluginExtension> {
                 toolchain {
-                    languageVersion.set(JavaLanguageVersion.of(11))
+                    languageVersion.set(JavaLanguageVersion.of(16))
                 }
             }
         }
