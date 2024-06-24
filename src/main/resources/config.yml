@@ -1,5 +1,9 @@
 import: true
-mongodb-uri: ""
+mongodb-db:
+  username: "admin"
+  password: "admin"
+  address: "127.0.0.1"
+  db-name: "admin"
 
 packages:
   Kraken:

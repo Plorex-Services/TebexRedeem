@@ -8,6 +8,7 @@ import it.bitrule.tebex.listener.PlayerJoinListener;
 import it.bitrule.tebex.model.TebexIdTransaction;
 import it.bitrule.tebex.model.TebexTransaction;
 import lombok.NonNull;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import javax.annotation.Nullable;
@@ -31,16 +32,40 @@ public final class TebexPlugin extends JavaPlugin {
             throw new RuntimeException("MongoDB URI not found");
         }
 
-        Miwiklark.authMongo(mongodbUri);
+        ConfigurationSection mongoSection = this.getConfig().getConfigurationSection("mongodb");
+        if (mongoSection == null) {
+            throw new RuntimeException("MongoDB section not found");
+        }
+
+        String dbUsername = mongoSection.getString("username");
+        String password = mongoSection.getString("password");
+
+        if (dbUsername == null || dbUsername.isEmpty()) {
+            throw new RuntimeException("MongoDB username not found");
+        }
+
+        if (password == null || password.isEmpty()) {
+            throw new RuntimeException("MongoDB password not found");
+        }
+
+        String address = mongoSection.getString("address");
+        String[] addressSplit = address.split(":");
+
+        Miwiklark.authMongo(String.format("mongodb://%s:%s@%s:%s/", dbUsername, password, addressSplit[0], addressSplit.length > 1 ? addressSplit[1] : "27017"));
+
+        String dbName = mongoSection.getString("db-name");
+        if (dbName == null || dbName.isEmpty()) {
+            throw new RuntimeException("MongoDB database name not found");
+        }
 
         Repository<TebexTransaction> premiumRepository = Miwiklark.addRepository(
                 TebexTransaction.class,
-                "tebex",
+                dbName,
                 "premium"
         );
         Repository<TebexIdTransaction> repository = Miwiklark.addRepository(
                 TebexIdTransaction.class,
-                "tebex",
+                dbName,
                 "id"
         );
 

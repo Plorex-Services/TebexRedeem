@@ -31,15 +31,16 @@ public final class RedeemCommandExecutor implements CommandExecutor {
         Repository<TebexIdTransaction> repository = Miwiklark.getRepository(TebexIdTransaction.class);
         CompletableFuture.supplyAsync(() -> repository.findOne(args[0]))
                 .thenAccept(transactionOptional -> {
-                    if (transactionOptional.isEmpty()) {
+                    TebexIdTransaction transaction = transactionOptional.orElse(null);
+                    if (transaction == null) {
                         commandSender.sendMessage(ChatColor.RED + "Invalid Tebex ID");
 
                         return;
                     }
 
-                    commandSender.sendMessage(ChatColor.GREEN + "You have redeemed the package " + transactionOptional.get().getPackageName());
+                    commandSender.sendMessage(ChatColor.GREEN + "You have redeemed the package " + transaction.getPackageName());
 
-                    String[] packages = transactionOptional.get().getPackageName().split(", ");
+                    String[] packages = transaction.getPackageName().split(", ");
                     for (String packageName : packages) {
                         List<String> commands = this.plugin.getConfig().getStringList("packages." + packageName);
                         if (commands == null || commands.isEmpty()) continue;
@@ -52,7 +53,7 @@ public final class RedeemCommandExecutor implements CommandExecutor {
                         }
                     }
 
-                    repository.delete(transactionOptional.get().getIdentifier());
+                    repository.delete(transaction.getIdentifier());
                 });
 
         return false;

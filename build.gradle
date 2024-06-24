@@ -23,6 +23,7 @@ dependencies {
     compileOnly files("lib/PaperSpigot-1.8.8-R0.1-SNAPSHOT.jar")
 
     compileOnly(libs.annotations.get())
+    compileOnly(libs.mongodb.get())
     implementation(libs.miwiklark.get())
 
     compileOnly(libs.lombok.get())
