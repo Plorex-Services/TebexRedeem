@@ -3,7 +3,8 @@ package it.bitrule.tebex.command;
 import it.bitrule.miwiklark.common.Miwiklark;
 import it.bitrule.miwiklark.common.repository.Repository;
 import it.bitrule.tebex.TebexPlugin;
-import it.bitrule.tebex.model.TebexIdTransaction;
+import it.bitrule.tebex.object.model.TebexIdTransaction;
+import it.bitrule.tebex.object.tebex.Package;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.bukkit.Bukkit;
@@ -14,6 +15,7 @@ import org.bukkit.command.CommandSender;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 public final class RedeemCommandExecutor implements CommandExecutor {
@@ -38,11 +40,10 @@ public final class RedeemCommandExecutor implements CommandExecutor {
                         return;
                     }
 
-                    commandSender.sendMessage(ChatColor.GREEN + "You have redeemed the package " + transaction.getPackageName());
+                    commandSender.sendMessage(ChatColor.GREEN + "You have redeemed the package " + transaction.getPackages().stream().map(Package::getName).collect(Collectors.joining(", ")));
 
-                    String[] packages = transaction.getPackageName().split(", ");
-                    for (String packageName : packages) {
-                        List<String> commands = this.plugin.getConfig().getStringList("packages." + packageName.replaceAll("'", ""));
+                    for (Package tebexPackage : transaction.getPackages()) {
+                        List<String> commands = this.plugin.getConfig().getStringList("packages." + tebexPackage.getName());
                         if (commands == null || commands.isEmpty()) continue;
 
                         for (String commandName : commands) {

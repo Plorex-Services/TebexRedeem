@@ -5,7 +5,8 @@ import com.mongodb.client.model.Filters;
 import it.bitrule.miwiklark.common.Miwiklark;
 import it.bitrule.miwiklark.common.repository.Repository;
 import it.bitrule.tebex.TebexPlugin;
-import it.bitrule.tebex.model.TebexTransaction;
+import it.bitrule.tebex.object.model.TebexTransaction;
+import it.bitrule.tebex.object.tebex.Package;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.bukkit.Bukkit;
@@ -39,10 +40,8 @@ public final class PlayerJoinListener implements Listener {
                 this.plugin,
                 () -> repository.findMany(Filters.eq("source", source.getUniqueId().toString()))
                         .forEach(transaction -> {
-                            String[] packages = transaction.getPackageName().split(", ");
-
-                            for (String packageName : packages) {
-                                List<String> commands = this.plugin.getConfig().getStringList("packages." + packageName.replaceAll("'", ""));
+                            for (Package tebexPackage : transaction.getPackages()) {
+                                List<String> commands = this.plugin.getConfig().getStringList("packages." + tebexPackage.getName());
                                 if (commands == null || commands.isEmpty()) continue;
 
                                 for (String command : commands) {

@@ -1,24 +1,19 @@
 package it.bitrule.tebex;
 
-import com.google.gson.*;
 import it.bitrule.miwiklark.common.Miwiklark;
-import it.bitrule.miwiklark.common.repository.Repository;
 import it.bitrule.tebex.command.RedeemCommandExecutor;
 import it.bitrule.tebex.listener.PlayerJoinListener;
-import it.bitrule.tebex.model.TebexIdTransaction;
-import it.bitrule.tebex.model.TebexTransaction;
-import lombok.NonNull;
+import it.bitrule.tebex.repository.LabymodRepository;
+import it.bitrule.tebex.repository.TebexRepository;
+import lombok.SneakyThrows;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import javax.annotation.Nullable;
 import java.io.*;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.text.SimpleDateFormat;
 
 public final class TebexPlugin extends JavaPlugin {
 
+    @SneakyThrows
     public void onEnable() {
         this.saveDefaultConfig();
 
@@ -33,199 +28,39 @@ public final class TebexPlugin extends JavaPlugin {
         }
 
         String dbUsername = mongoSection.getString("username");
-
         if (dbUsername == null || dbUsername.isEmpty()) {
             throw new RuntimeException("MongoDB username not found");
+        }
+
+        String password = mongoSection.getString("password");
+        if (password != null && !password.isEmpty()) {
+            dbUsername = dbUsername + ":" + password; // TODO: This is to implement the password into the db username
         }
 
         String address = mongoSection.getString("address");
         String[] addressSplit = address.split(":");
 
-        Miwiklark.authMongo(String.format("mongodb://%s:%s@%s:%s/", dbUsername, mongoSection.getString("password"), addressSplit[0], addressSplit.length > 1 ? addressSplit[1] : "27017"));
+        Miwiklark.authMongo(String.format("mongodb://%s@%s:%s/", dbUsername, addressSplit[0], addressSplit.length > 1 ? addressSplit[1] : "27017"));
 
         String dbName = mongoSection.getString("db-name");
         if (dbName == null || dbName.isEmpty()) {
             throw new RuntimeException("MongoDB database name not found");
         }
 
-        Repository<TebexTransaction> premiumRepository = Miwiklark.addRepository(
-                TebexTransaction.class,
-                dbName,
-                "premium"
-        );
-        Repository<TebexIdTransaction> repository = Miwiklark.addRepository(
-                TebexIdTransaction.class,
-                dbName,
-                "id"
-        );
-
         this.getCommand("redeem").setExecutor(new RedeemCommandExecutor(this));
-
         this.getServer().getPluginManager().registerEvents(new PlayerJoinListener(this), this);
 
         if (!this.getConfig().getBoolean("import")) return;
 
-        try {
-            BufferedReader reader = new BufferedReader(new FileReader(file));
-            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-ddhh:mm:ss");
+        TebexRepository tebexRepository = new TebexRepository();
+        tebexRepository.init(this.getConfig().getString("tebex-secret"));
 
-            String line;
-            int lineNumber = 0;
-            while ((line = reader.readLine()) != null) {
-                lineNumber++;
-                if (lineNumber == 1) continue;
+        LabymodRepository labymodRepository = new LabymodRepository();
+        labymodRepository.init();
 
-                String[] parts = line.split(",");
-                if (parts.length == 0) {
-                    throw new RuntimeException("Invalid line in tebex.csv: " + line);
-                }
-
-                if (parts.length < 16) {
-                    System.out.println("Skipping line in tebex.csv: " + line);
-
-                    continue;
-                }
-
-                String transactionId = parts[1];
-                String date = parts[2];
-                String status = parts[3];
-                if (!status.equals("Complete")) continue;
-
-                String finalPackages = validatePackages(parts);
-                if (finalPackages == null) {
-                    System.out.println("Failed to find packages for " + transactionId);
-
-                    continue;
-                }
-
-                String uuid = parts[6];
-                if (uuid.startsWith("0000000000000000000000")) {
-                    repository.save(new TebexIdTransaction(
-                            transactionId,
-                            finalPackages
-                    ));
-
-                    continue;
-                }
-
-                if (premiumRepository.findOne(transactionId).isPresent()) continue;
-
-                String username = parts[5];
-                System.out.println("Processing transaction " + transactionId + " for " + username + " with packages " + finalPackages);
-//
-                JsonObject jsonObject = this.parseJson("https://laby.net/api/search/get-previous-accounts/" + username);
-                if (jsonObject == null) {
-                    System.out.println("Failed to fetch previous accounts for " + username);
-
-                    continue;
-                }
-
-                JsonPrimitive hiddenObject = jsonObject.getAsJsonPrimitive("has_hidden");
-                if (hiddenObject == null || hiddenObject.getAsBoolean()) continue;
-
-                JsonArray jsonArray = jsonObject.getAsJsonArray("users");
-                if (jsonArray == null) {
-                    throw new RuntimeException("Failed to fetch users for " + username);
-                }
-
-                if (jsonArray.size() == 0) continue;
-
-                long purchasedTime = simpleDateFormat.parse(date.replaceAll("T", "").replaceAll("\\+", "")).getTime();
-
-                JsonObject betterJsonObject = null;
-                Long betterChangedAt = null;
-
-                for (JsonElement jsonElement : jsonArray) {
-                    JsonObject userObject = jsonElement.getAsJsonObject();
-                    if (userObject == null) {
-                        throw new RuntimeException("Failed to fetch user object");
-                    }
-
-                    JsonArray historyArray = userObject.getAsJsonArray("history");
-                    if (historyArray == null || historyArray.size() == 0) {
-                        throw new RuntimeException("Failed to fetch history object");
-                    }
-
-                    for (JsonElement historyElement : historyArray) {
-                        JsonObject historyObject = historyElement.getAsJsonObject();
-                        if (historyObject == null) {
-                            throw new RuntimeException("Failed to fetch history object");
-                        }
-
-                        String name = historyObject.get("name").getAsString();
-                        if (name == null) {
-                            throw new RuntimeException("Failed to fetch name object");
-                        }
-
-                        if (!name.equals(username)) continue;
-
-                        JsonElement changedAtObject = historyObject.get("changed_at");
-                        if (changedAtObject != null && !changedAtObject.isJsonNull()) {
-                            String changedAt = changedAtObject.getAsString();
-                            if (changedAt == null) continue;
-
-                            long changedAtTime = simpleDateFormat.parse(changedAt.replaceAll("T", "").replaceAll("\\+", "")).getTime();
-                            if (changedAtTime > purchasedTime) continue;
-                            if (betterChangedAt != null && betterChangedAt > changedAtTime) continue;
-
-                            betterChangedAt = changedAtTime;
-                        }
-
-                        betterJsonObject = userObject;
-                    }
-                }
-
-                if (betterJsonObject == null) continue;
-
-//                System.out.println("Better account is " + betterJsonObject.get("uuid").getAsString());
-
-                premiumRepository.save(new TebexTransaction(
-                        transactionId,
-                        betterJsonObject.get("uuid").getAsString(),
-                        finalPackages
-                ));
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to read tebex.csv", e);
-        }
+        tebexRepository.adapt(labymodRepository, dbName);
 
         this.getConfig().set("import", false);
         this.saveConfig();
-    }
-
-    private static @Nullable String validatePackages(String[] parts) {
-        for (int j = parts.length - 1; j >= 0; j--) {
-            if (parts[j].equals("'Permanents'") || parts[j].equals("'Upgrades'")) return parts[j - 1];
-        }
-
-        return null;
-    }
-
-    private @Nullable JsonObject parseJson(@NonNull String urlString) {
-        try {
-            URL url = new URL(urlString);
-
-            HttpURLConnection http = (HttpURLConnection) url.openConnection();
-            http.setRequestProperty("Accept", "application/json");
-
-            int responseCode = http.getResponseCode();
-            InputStream inputStream = 200 <= responseCode && responseCode <= 299 ? http.getInputStream() : http.getErrorStream();
-            if (inputStream == null) return null;
-
-            BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
-            StringBuilder response = new StringBuilder();
-            String currentLine;
-            while ((currentLine = in.readLine()) != null) {
-                response.append(currentLine);
-            }
-
-            in.close();
-
-            return new JsonParser().parse(response.toString()).getAsJsonObject();
-        } catch (Exception e) {
-            e.printStackTrace(System.err);
-        }
-
-        return null;
     }
 }

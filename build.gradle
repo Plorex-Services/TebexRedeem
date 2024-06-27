@@ -20,6 +20,11 @@ repositories {
 }
 
 dependencies {
+    implementation 'com.squareup.retrofit2:converter-gson:2.11.0'
+    implementation 'com.squareup.retrofit2:retrofit:2.11.0'
+
+    compileOnly this.libs.gson.get()
+
     compileOnly files("lib/PaperSpigot-1.8.8-R0.1-SNAPSHOT.jar")
 
     compileOnly(libs.annotations.get())

@@ -1,4 +1,7 @@
 import: true
+
+tebex-secret: "TEBEX_SECRET"
+
 mongodb:
   username: "admin"
   password: "admin"
