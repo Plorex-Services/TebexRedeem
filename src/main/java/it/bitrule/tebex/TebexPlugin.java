@@ -9,18 +9,11 @@ import lombok.SneakyThrows;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.*;
-
 public final class TebexPlugin extends JavaPlugin {
 
     @SneakyThrows
     public void onEnable() {
         this.saveDefaultConfig();
-
-        File file = new File(this.getDataFolder(), "tebex.csv");
-        if (!file.exists()) {
-            throw new RuntimeException("tebex.csv not found");
-        }
 
         ConfigurationSection mongoSection = this.getConfig().getConfigurationSection("mongodb");
         if (mongoSection == null) {
@@ -43,12 +36,13 @@ public final class TebexPlugin extends JavaPlugin {
         }
 
         String[] addressSplit = address.split(":");
-
         String password = mongoSection.getString("password");
         if (password == null || password.isEmpty()) {
-            Miwiklark.withoutAuth(dbUsername, dbName, addressSplit[0], addressSplit.length > 1 ? Integer.parseInt(addressSplit[1]) : 27017);
+            System.out.println("Connecting to MongoDB without authentication");
+            Miwiklark.withoutAuth(addressSplit[0], addressSplit.length > 1 ? Integer.parseInt(addressSplit[1]) : 27017);
         } else {
-            Miwiklark.authMongo(String.format("mongodb://%s:%s@%s:%s/", dbUsername, password, addressSplit[0], addressSplit.length > 1 ? addressSplit[1] : "27017"));
+            System.out.println("Connecting to MongoDB with authentication");
+            Miwiklark.authMongo(String.format("mongodb://%s:%s@%s:%s/admin", dbUsername, password, addressSplit[0], addressSplit.length > 1 ? addressSplit[1] : "27017"));
         }
 
         TebexRepository tebexRepository = new TebexRepository();

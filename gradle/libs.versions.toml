@@ -5,11 +5,11 @@ bukkitPluginYAML = "net.minecrell.plugin-yml.bukkit:0.5.1"
 
 [libraries]
 lombok = "org.projectlombok:lombok:1.18.24"
-mongodb = "org.mongodb:mongodb-driver-sync:4.8.1"
+mongodb = "org.mongodb:mongodb-driver:3.12.10"
 gson = "com.google.code.gson:gson:2.10.1"
 jedis = "redis.clients:jedis:2.10.2"
 googleCollections = "com.google.collections:google-collections:1.0"
 apacheCommons = "org.apache.commons:commons-lang3:3.0"
 annotations = "org.jetbrains:annotations:24.0.1"
 
-miwiklark = "it.bitrule.miwiklark:miwiklark-core:2024.0627.17"
+miwiklark = "it.bitrule.miwiklark:miwiklark-core:2024.0627.17.3"
