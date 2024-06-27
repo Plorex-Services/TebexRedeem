@@ -5,6 +5,8 @@ import it.bitrule.miwiklark.common.repository.Repository;
 import it.bitrule.tebex.TebexPlugin;
 import it.bitrule.tebex.object.model.TebexIdTransaction;
 import it.bitrule.tebex.object.tebex.Package;
+import it.bitrule.tebex.object.tebex.Payment;
+import it.bitrule.tebex.repository.TebexRepository;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.bukkit.Bukkit;
@@ -12,6 +14,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -21,6 +24,7 @@ import java.util.stream.Collectors;
 public final class RedeemCommandExecutor implements CommandExecutor {
 
     private final @NonNull TebexPlugin plugin;
+    private final @NonNull TebexRepository tebexRepository;
 
     @Override
     public boolean onCommand(CommandSender commandSender, Command command, String s, String[] args) {
@@ -30,33 +34,48 @@ public final class RedeemCommandExecutor implements CommandExecutor {
             return true;
         }
 
+        if (!(commandSender instanceof Player)) {
+            commandSender.sendMessage(ChatColor.RED + "You must be a player to execute this command");
+
+            return true;
+        }
+
         Repository<TebexIdTransaction> repository = Miwiklark.getRepository(TebexIdTransaction.class);
-        CompletableFuture.supplyAsync(() -> repository.findOne(args[0]))
-                .thenAccept(transactionOptional -> {
-                    TebexIdTransaction transaction = transactionOptional.orElse(null);
-                    if (transaction == null) {
-                        commandSender.sendMessage(ChatColor.RED + "Invalid Tebex ID");
+        CompletableFuture.runAsync(() -> {
+            if (repository.findOne(args[0]).isPresent()) {
+                commandSender.sendMessage(ChatColor.RED + "You have already redeemed this package");
 
-                        return;
-                    }
+                return;
+            }
 
-                    commandSender.sendMessage(ChatColor.GREEN + "You have redeemed the package " + transaction.getPackages().stream().map(Package::getName).collect(Collectors.joining(", ")));
+            Payment payment = this.tebexRepository.lookup(args[0]);
+            if (payment == null) {
+                commandSender.sendMessage(ChatColor.RED + "Failed to fetch payment");
 
-                    for (Package tebexPackage : transaction.getPackages()) {
-                        List<String> commands = this.plugin.getConfig().getStringList("packages." + tebexPackage.getName());
-                        if (commands == null || commands.isEmpty()) continue;
+                return;
+            }
 
-                        for (String commandName : commands) {
-                            Bukkit.dispatchCommand(
-                                    Bukkit.getConsoleSender(),
-                                    commandName.replace("{player}", commandSender.getName())
-                            );
-                        }
-                    }
+            commandSender.sendMessage(ChatColor.GREEN + "You have redeemed the package " + payment.getPackages().stream().map(Package::getName).collect(Collectors.joining(", ")));
 
-                    repository.delete(transaction.getIdentifier());
-                });
+            for (Package tebexPackage : payment.getPackages()) {
+                List<String> commands = this.plugin.getConfig().getStringList("packages." + tebexPackage.getName());
+                if (commands == null || commands.isEmpty()) continue;
 
-        return false;
+                for (String commandName : commands) {
+                    Bukkit.dispatchCommand(
+                            Bukkit.getConsoleSender(),
+                            commandName.replace("{player}", commandSender.getName())
+                    );
+                }
+            }
+
+            repository.save(new TebexIdTransaction(args[0], ((Player) commandSender).getUniqueId().toString()));
+        }).exceptionally(throwable -> {
+            commandSender.sendMessage(ChatColor.RED + "Failed to check if you have already redeemed this package: " + throwable.getMessage());
+
+            return null;
+        });
+
+        return true;
     }
 }

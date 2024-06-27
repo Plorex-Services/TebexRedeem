@@ -32,28 +32,32 @@ public final class TebexPlugin extends JavaPlugin {
             throw new RuntimeException("MongoDB username not found");
         }
 
-        String password = mongoSection.getString("password");
-        if (password != null && !password.isEmpty()) {
-            dbUsername = dbUsername + ":" + password; // TODO: This is to implement the password into the db username
-        }
-
-        String address = mongoSection.getString("address");
-        String[] addressSplit = address.split(":");
-
-        Miwiklark.authMongo(String.format("mongodb://%s@%s:%s/", dbUsername, addressSplit[0], addressSplit.length > 1 ? addressSplit[1] : "27017"));
-
         String dbName = mongoSection.getString("db-name");
         if (dbName == null || dbName.isEmpty()) {
             throw new RuntimeException("MongoDB database name not found");
         }
 
-        this.getCommand("redeem").setExecutor(new RedeemCommandExecutor(this));
-        this.getServer().getPluginManager().registerEvents(new PlayerJoinListener(this), this);
+        String address = mongoSection.getString("address");
+        if (address == null || address.isEmpty()) {
+            throw new RuntimeException("MongoDB address not found");
+        }
 
-        if (!this.getConfig().getBoolean("import")) return;
+        String[] addressSplit = address.split(":");
+
+        String password = mongoSection.getString("password");
+        if (password == null || password.isEmpty()) {
+            Miwiklark.withoutAuth(dbUsername, dbName, addressSplit[0], addressSplit.length > 1 ? Integer.parseInt(addressSplit[1]) : 27017);
+        } else {
+            Miwiklark.authMongo(String.format("mongodb://%s:%s@%s:%s/", dbUsername, password, addressSplit[0], addressSplit.length > 1 ? addressSplit[1] : "27017"));
+        }
 
         TebexRepository tebexRepository = new TebexRepository();
         tebexRepository.init(this.getConfig().getString("tebex-secret"));
+
+        this.getCommand("redeem").setExecutor(new RedeemCommandExecutor(this, tebexRepository));
+        this.getServer().getPluginManager().registerEvents(new PlayerJoinListener(this), this);
+
+        if (!this.getConfig().getBoolean("import")) return;
 
         LabymodRepository labymodRepository = new LabymodRepository();
         labymodRepository.init();

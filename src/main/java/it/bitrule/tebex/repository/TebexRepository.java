@@ -39,10 +39,39 @@ public final class TebexRepository {
         this.paymentsService = retrofit.create(PaymentsService.class);
     }
 
+    public @Nullable Payment lookup(@NonNull String transactionId) {
+        if (this.paymentsService == null) {
+            throw new RuntimeException("Payments service not initialized");
+        }
+
+        try {
+            Response<Payment> response = this.paymentsService.lookup(transactionId).execute();
+            if (!response.isSuccessful()) {
+                throw new RuntimeException("Failed to fetch payment: " + response.errorBody().string() + " (" + response.code() + ") / " + response.message());
+            }
+
+            Payment payment = response.body();
+            if (payment == null) {
+                throw new RuntimeException("Failed to fetch payment: " + response.errorBody().string() + " (" + response.code() + ") / " + response.message());
+            }
+
+            return payment;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch payment: " + e.getMessage(), e);
+        }
+    }
+
     public void adapt(@NonNull LabymodRepository labymodRepository, @NonNull String dbName) throws Exception {
         if (this.paymentsService == null) {
             throw new RuntimeException("Payments service not initialized");
         }
+
+        // This repository is only for who already redeemed the package
+        Miwiklark.addRepository(
+                TebexIdTransaction.class,
+                dbName,
+                "id"
+        );
 
         Repository<TebexTransaction> premiumRepository = Miwiklark.addRepository(
                 TebexTransaction.class,
@@ -71,9 +100,10 @@ public final class TebexRepository {
             for (Payment payment : paymentsInfo.getPayments()) {
                 if (!payment.getStatus().equalsIgnoreCase("complete")) continue;
 
+                if (payment.getPlayer().getUniqueId().startsWith("0000000000000000000000")) continue;
+
                 String transactionId = payment.getId();
                 if (premiumRepository.findOne(transactionId).isPresent()) continue;
-                if (payment.getPlayer().getUniqueId().startsWith("0000000000000000000000")) continue;
 
                 String username = payment.getPlayer().getName();
                 System.out.println("Processing transaction " + transactionId + " for " + username + " with packages " + payment.getPackages());
