@@ -34,10 +34,16 @@ public final class LabymodRepository {
         }
 
         Response<JsonObject> response = this.accountsService.lookup(username).execute();
-        if (!response.isSuccessful()) return null;
+        if (!response.isSuccessful()) {
+            System.out.println("Failed to fetch response: " + response.errorBody().string());
+            return null;
+        }
 
         JsonObject jsonObject = response.body();
-        if (jsonObject == null) return null;
+        if (jsonObject == null) {
+            System.out.println("Failed to fetch JSON object");
+            return null;
+        }
 
         JsonPrimitive hiddenObject = jsonObject.getAsJsonPrimitive("has_hidden");
         if (hiddenObject == null || hiddenObject.getAsBoolean()) return null;
@@ -47,7 +53,11 @@ public final class LabymodRepository {
             throw new RuntimeException("Failed to fetch users for " + username);
         }
 
-        if (jsonArray.size() == 0) return null;
+        if (jsonArray.size() == 0) {
+            System.out.println("No users found");
+
+            return null;
+        }
 
         long purchasedTime = TebexRepository.SIMPLE_DATE_FORMAT.parse(purchaseDate.replaceAll("T", "").replaceAll("\\+", "")).getTime();
 
@@ -76,15 +86,20 @@ public final class LabymodRepository {
                     throw new RuntimeException("Failed to fetch name object");
                 }
 
-                if (!name.equals(username)) continue;
+                if (!name.equalsIgnoreCase(username)) continue;
 
                 JsonElement changedAtObject = historyObject.get("changed_at");
                 if (changedAtObject != null && !changedAtObject.isJsonNull()) {
                     String changedAt = changedAtObject.getAsString();
                     if (changedAt == null) continue;
 
+                    // TODO: Changed at time is the time when he changed his username to the current one
                     long changedAtTime = TebexRepository.SIMPLE_DATE_FORMAT.parse(changedAt.replaceAll("T", "").replaceAll("\\+", "")).getTime();
-                    if (changedAtTime > purchasedTime) continue;
+                    if (purchasedTime > changedAtTime) {
+                        System.out.println("Me lo cambie en " + changedAt + " y lo compre el " + purchaseDate);
+
+                        continue;
+                    }
                     if (betterChangedAt != null && betterChangedAt > changedAtTime) continue;
 
                     betterChangedAt = changedAtTime;
@@ -94,10 +109,18 @@ public final class LabymodRepository {
             }
         }
 
-        if (betterJsonObject == null) return null;
+        if (betterJsonObject == null) {
+            System.out.println("No user found");
+
+            return null;
+        }
 
         JsonPrimitive uuidObject = betterJsonObject.getAsJsonPrimitive("uuid");
-        if (uuidObject == null) return null;
+        if (uuidObject == null) {
+            System.out.println("No UUID found");
+
+            return null;
+        }
 
         return UUID.fromString(uuidObject.getAsString());
     }

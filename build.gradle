@@ -46,6 +46,9 @@ tasks {
 
     shadowJar {
         archiveFileName.set("${rootProject.name}-v${version}.jar")
+
+        relocate 'com.mongodb', 'it.bitrule.relocate.mongodb'
+        relocate 'org.bson', 'it.bitrule.relocate.bson'
     }
 
     compileJava {

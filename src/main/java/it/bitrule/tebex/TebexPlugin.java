@@ -3,6 +3,8 @@ package it.bitrule.tebex;
 import it.bitrule.miwiklark.common.Miwiklark;
 import it.bitrule.tebex.command.RedeemCommandExecutor;
 import it.bitrule.tebex.listener.PlayerJoinListener;
+import it.bitrule.tebex.object.model.TebexIdTransaction;
+import it.bitrule.tebex.object.model.TebexTransaction;
 import it.bitrule.tebex.repository.LabymodRepository;
 import it.bitrule.tebex.repository.TebexRepository;
 import lombok.SneakyThrows;
@@ -45,6 +47,19 @@ public final class TebexPlugin extends JavaPlugin {
             Miwiklark.authMongo(String.format("mongodb://%s:%s@%s:%s/admin", dbUsername, password, addressSplit[0], addressSplit.length > 1 ? addressSplit[1] : "27017"));
         }
 
+        // This repository is only for who already redeemed the package
+        Miwiklark.addRepository(
+                TebexIdTransaction.class,
+                dbName,
+                "id"
+        );
+
+        Miwiklark.addRepository(
+                TebexTransaction.class,
+                dbName,
+                "premium"
+        );
+
         TebexRepository tebexRepository = new TebexRepository();
         tebexRepository.init(this.getConfig().getString("tebex-secret"));
 
@@ -56,9 +71,13 @@ public final class TebexPlugin extends JavaPlugin {
         LabymodRepository labymodRepository = new LabymodRepository();
         labymodRepository.init();
 
-        tebexRepository.adapt(labymodRepository, dbName);
+        int page = tebexRepository.adapt(labymodRepository, this.getConfig().getInt("import-page", 1));
+        if (page == -1) {
+            this.getConfig().set("import", false);
+        } else {
+            this.getConfig().set("import-page", page);
+        }
 
-        this.getConfig().set("import", false);
         this.saveConfig();
     }
 }

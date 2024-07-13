@@ -14,7 +14,7 @@ public final class text {
         labymodRepository.init();
 
         try {
-            tebexRepository.adapt(labymodRepository, "tebex");
+            tebexRepository.adapt(labymodRepository, 1);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

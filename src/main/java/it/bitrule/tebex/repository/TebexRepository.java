@@ -2,7 +2,6 @@ package it.bitrule.tebex.repository;
 
 import it.bitrule.miwiklark.common.Miwiklark;
 import it.bitrule.miwiklark.common.repository.Repository;
-import it.bitrule.tebex.object.model.TebexIdTransaction;
 import it.bitrule.tebex.object.model.TebexTransaction;
 import it.bitrule.tebex.object.tebex.Payment;
 import it.bitrule.tebex.object.tebex.PaymentsInfo;
@@ -24,14 +23,13 @@ public final class TebexRepository {
 
     public void init(@NonNull String tebexSecret) {
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl("https://plugin.buycraft.net/")
+                .baseUrl("https://plugin.tebex.io/")
                 .addConverterFactory(GsonConverterFactory.create())
                 .client(new OkHttpClient.Builder()
                         .addInterceptor(chain -> chain.proceed(chain.request().newBuilder()
                                 .addHeader("X-Tebex-Secret", tebexSecret)
                                 .build()
                         ))
-
                         .build()
                 )
                 .build();
@@ -61,66 +59,69 @@ public final class TebexRepository {
         }
     }
 
-    public void adapt(@NonNull LabymodRepository labymodRepository, @NonNull String dbName) throws Exception {
+    public int adapt(@NonNull LabymodRepository labymodRepository, int initialPage) {
         if (this.paymentsService == null) {
             throw new RuntimeException("Payments service not initialized");
         }
 
-        // This repository is only for who already redeemed the package
-        Miwiklark.addRepository(
-                TebexIdTransaction.class,
-                dbName,
-                "id"
-        );
+        Repository<TebexTransaction> premiumRepository = Miwiklark.getRepository(TebexTransaction.class);
 
-        Repository<TebexTransaction> premiumRepository = Miwiklark.addRepository(
-                TebexTransaction.class,
-                dbName,
-                "premium"
-        );
-
-        int page = 1;
+        int page = initialPage;
         while (page != -1) {
-            Response<PaymentsInfo> response = this.paymentsService.retrieve(page).execute();
-            if (!response.isSuccessful()) {
-                throw new RuntimeException("Failed to fetch payments: " + response.errorBody().string() + " (" + response.code() + ") / " + response.message());
-            }
-
-            PaymentsInfo paymentsInfo = response.body();
-            if (paymentsInfo == null) {
-                throw new RuntimeException("Failed to fetch payments: " + response.errorBody().string() + " (" + response.code() + ") / " + response.message());
-            }
-
-            if (paymentsInfo.getPayments().isEmpty()) {
-                System.out.println("No payments found");
-
-                break;
-            }
-
-            for (Payment payment : paymentsInfo.getPayments()) {
-                if (!payment.getStatus().equalsIgnoreCase("complete")) continue;
-
-                if (payment.getPlayer().getUniqueId().startsWith("0000000000000000000000")) continue;
-
-                String transactionId = payment.getId();
-                if (premiumRepository.findOne(transactionId).isPresent()) continue;
-
-                String username = payment.getPlayer().getName();
-                System.out.println("Processing transaction " + transactionId + " for " + username + " with packages " + payment.getPackages());
-
-                UUID uniqueId = labymodRepository.validate(username, payment.getDate());
-                if (uniqueId == null) {
-                    System.out.println("Failed to fetch previous accounts for " + username);
-
-                    continue;
+            try {
+                Response<PaymentsInfo> response = this.paymentsService.retrieve(page).execute();
+                if (!response.isSuccessful()) {
+                    throw new RuntimeException("Failed to fetch payments: " + response.errorBody().string() + " (" + response.code() + ") / " + response.message());
                 }
 
-                System.out.println("Found previous account for " + username + " with UUID " + uniqueId);
+                PaymentsInfo paymentsInfo = response.body();
+                if (paymentsInfo == null) {
+                    throw new RuntimeException("Failed to fetch payments: " + response.errorBody().string() + " (" + response.code() + ") / " + response.message());
+                }
 
-                premiumRepository.save(new TebexTransaction(transactionId, uniqueId.toString(), payment.getPackages()));
+                if (paymentsInfo.getPayments().isEmpty()) {
+                    System.out.println("No payments found");
+
+                    break;
+                }
+
+                if (paymentsInfo.getCurrentPage() != page) {
+                    System.out.println("Failed to fetch payments: " + paymentsInfo.getCurrentPage() + " != " + page);
+
+                    return -1;
+                }
+
+                for (Payment payment : paymentsInfo.getPayments()) {
+                    if (!payment.getStatus().equalsIgnoreCase("complete")) continue;
+                    if (payment.getPlayer().getName().contains(" ")) continue;
+                    if (payment.getPlayer().getUniqueId().startsWith("0000000000000000000000")) continue;
+
+                    String transactionId = payment.getId();
+                    if (premiumRepository.findOne(transactionId).isPresent()) continue;
+
+                    String username = payment.getPlayer().getName();
+                    System.out.println("Processing transaction " + transactionId + " for " + username + " with packages " + payment.getPackages());
+
+                    UUID uniqueId = labymodRepository.validate(username, payment.getDate());
+                    if (uniqueId == null) {
+                        System.out.println("Failed to fetch previous accounts for " + username);
+
+                        continue;
+                    }
+
+                    System.out.println("Found previous account for " + username + " with UUID " + uniqueId);
+
+                    premiumRepository.save(new TebexTransaction(transactionId, uniqueId.toString(), payment.getPackages()));
+                }
+
+                page++;
+            } catch (Exception e) {
+                System.out.println("Failed to fetch payments: " + e.getMessage());
+
+                return page;
             }
-
-            page++;
         }
+
+        return page;
     }
 }
