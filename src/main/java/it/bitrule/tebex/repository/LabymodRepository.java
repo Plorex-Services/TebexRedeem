@@ -33,10 +33,20 @@ public final class LabymodRepository {
             throw new IllegalStateException("LabymodRepository has not been initialized yet");
         }
 
+        int attempts = 1;
         Response<JsonObject> response = this.accountsService.lookup(username).execute();
-        if (!response.isSuccessful()) {
-            System.out.println("Failed to fetch response: " + response.errorBody().string());
-            return null;
+        while (!response.isSuccessful()) {
+            System.out.println("Failed to fetch response: " + response.errorBody().string() + " (attempt " + attempts + ")");
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace(System.err);
+            }
+
+            response = this.accountsService.lookup(username).execute();
+
+            attempts++;
         }
 
         JsonObject jsonObject = response.body();
@@ -95,11 +105,12 @@ public final class LabymodRepository {
 
                     // TODO: Changed at time is the time when he changed his username to the current one
                     long changedAtTime = TebexRepository.SIMPLE_DATE_FORMAT.parse(changedAt.replaceAll("T", "").replaceAll("\\+", "")).getTime();
-                    if (purchasedTime > changedAtTime) {
+                    if (betterChangedAt != null && purchasedTime > changedAtTime) {
                         System.out.println("Me lo cambie en " + changedAt + " y lo compre el " + purchaseDate);
 
                         continue;
                     }
+
                     if (betterChangedAt != null && betterChangedAt > changedAtTime) continue;
 
                     betterChangedAt = changedAtTime;

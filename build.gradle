@@ -83,7 +83,6 @@ bukkit {
     commands {
         "redeem" {
             description = "Redeem a code"
-            permission = "tebex.redeem"
             usage = "/redeem <code>"
         }
     }
