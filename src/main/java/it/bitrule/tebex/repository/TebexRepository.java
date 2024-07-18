@@ -8,6 +8,7 @@ import it.bitrule.tebex.object.tebex.PaymentsInfo;
 import it.bitrule.tebex.service.PaymentsService;
 import lombok.NonNull;
 import okhttp3.OkHttpClient;
+import org.bukkit.Bukkit;
 import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
@@ -69,7 +70,7 @@ public final class TebexRepository {
         int page = initialPage;
         while (page != -1) {
             try {
-                Response<PaymentsInfo> response = this.paymentsService.retrieve(page).execute();
+                Response<PaymentsInfo> response = this.paymentsService.retrieve(true, page).execute();
                 if (!response.isSuccessful()) {
                     throw new RuntimeException("Failed to fetch payments: " + response.errorBody().string() + " (" + response.code() + ") / " + response.message());
                 }
@@ -115,6 +116,8 @@ public final class TebexRepository {
                 }
 
                 page++;
+
+                Bukkit.getLogger().info("Successfully processed page " + page);
             } catch (Exception e) {
                 System.out.println("Failed to fetch payments: " + e.getMessage());
 

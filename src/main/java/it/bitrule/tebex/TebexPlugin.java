@@ -8,6 +8,7 @@ import it.bitrule.tebex.object.model.TebexTransaction;
 import it.bitrule.tebex.repository.LabymodRepository;
 import it.bitrule.tebex.repository.TebexRepository;
 import lombok.SneakyThrows;
+import org.bukkit.ChatColor;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -71,11 +72,16 @@ public final class TebexPlugin extends JavaPlugin {
         LabymodRepository labymodRepository = new LabymodRepository();
         labymodRepository.init();
 
+        getLogger().info(ChatColor.BLUE + "Importing data from Tebex!");
         int page = tebexRepository.adapt(labymodRepository, this.getConfig().getInt("import-page", 1));
         if (page == -1) {
             this.getConfig().set("import", false);
+
+            getLogger().info("Import completed");
         } else {
             this.getConfig().set("import-page", page);
+
+            getLogger().info("We got an issue and we are on the page " + page);
         }
 
         this.saveConfig();

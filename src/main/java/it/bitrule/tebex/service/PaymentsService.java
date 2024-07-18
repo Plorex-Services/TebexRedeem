@@ -11,7 +11,7 @@ import retrofit2.http.Query;
 public interface PaymentsService {
 
     @GET("payments")
-    @NonNull Call<PaymentsInfo> retrieve(@Query("paged") int page);
+    @NonNull Call<PaymentsInfo> retrieve(@Query("paged") boolean paged, @Query("page") int page);
 
     @GET("/payments/{transaction}")
     @NonNull Call<Payment> lookup(@Path("transaction") String transactionId);
